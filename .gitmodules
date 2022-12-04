@@ -1,9 +1,6 @@
 [submodule "third_party/open3d"]
 	path = third_party/open3d
 	url = https://github.com/isl-org/Open3D.git
-[submodule "third_party/librealsense"]
-	path = third_party/librealsense
-	url = https://github.com/IntelRealSense/librealsense.git
 [submodule "third_party/vcglib"]
 	path = third_party/vcglib
 	url = https://github.com/cnr-isti-vclab/vcglib.git
