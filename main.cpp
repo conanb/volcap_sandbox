@@ -11,6 +11,11 @@
 #include <librealsense2/rs.hpp>
 #include <librealsense2/hpp/rs_processing.hpp>
 
+#include <opencv2/calib3d.hpp>
+#include <opencv2/aruco.hpp>
+#include <opencv2/aruco/charuco.hpp>
+#include <opencv2/imgcodecs.hpp>
+
 static void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
@@ -21,6 +26,15 @@ struct rs2_gl_textures {
     GLuint color;
     GLuint depth;
 };
+
+static inline void createBoard()
+{
+    cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+    cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04f, 0.02f, dictionary);
+    cv::Mat boardImage;
+    board->draw(cv::Size(600, 500), boardImage, 10, 1);
+    cv::imwrite("BoardImage.jpg", boardImage);
+}
 
 int main() {
 
@@ -43,6 +57,8 @@ int main() {
 
 //    rs2::pointcloud pc;
  //   rs2::points points; 
+
+  //  createBoard();
     
     rs2::context rsContext;
 
@@ -73,10 +89,10 @@ int main() {
 
                 auto depth = frames.get_depth_frame();
                 auto color_depth = colorizer.colorize(depth);
-                auto color = frames.get_color_frame();
-
-                copyFrameToGLTexture(rs_textures[index].color, color);
                 copyFrameToGLTexture(rs_textures[index].depth, color_depth);
+
+                auto color = frames.get_color_frame();
+                copyFrameToGLTexture(rs_textures[index].color, color);
 
                 // points = pc.calculate(depth);
                 // pc.map_to(color);
@@ -88,7 +104,10 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         
-        ImGui::ShowDemoWindow();
+        if (ImGui::BeginMainMenuBar()) {
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::EndMainMenuBar();
+        }
 
         if (ImGui::Begin("RealSense")) {
             if (ImGui::BeginTable("Frames", 2)) {
@@ -103,7 +122,6 @@ int main() {
                 }
                 ImGui::EndTable();
             }
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();
         }
 
