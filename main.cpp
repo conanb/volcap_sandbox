@@ -17,6 +17,10 @@
 #include <opencv2/aruco/charuco.hpp>
 #include <opencv2/imgcodecs.hpp>
 
+#include "Visualiser.h"
+
+#include  <Eigen/Geometry>
+
 static void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
@@ -27,15 +31,44 @@ static cv::Mat frame_to_mat(const rs2::frame& f);
 static cv::Mat depth_frame_to_meters(const rs2::depth_frame& f);
 
 struct rs2_gl_textures {
-    GLuint color;
-    GLuint depth;
-    GLuint grabCut;
+    GLuint color = 0;
+    GLuint depth = 0;
+    GLuint grabCut = 0;
 
-    bool enabled;
-    bool rgbOn;
-    bool depthOn;
-    bool maskOn;
+    bool enabled = false;
+    bool rgbOn = false;
+    bool depthOn = false;
+
+    float depthMin = 0;
+    float depthMax = 10;
+
+    float cameraY = 0;
+
+    bool locked = false;
+
+    Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+
+    rs2::pointcloud pc;
+    rs2::points points; 
 };
+
+static Eigen::Matrix4f createPerspectiveMatrix(float yFoV, float aspect, float near, float far)
+{
+    Eigen::Matrix4f out = Eigen::Matrix4f::Zero();
+
+    const float
+        y_scale = (float)1.0f / tan((yFoV / 2.0f) * (std::numbers::pi_v<float> / 180.0f)),
+        x_scale = y_scale / aspect,
+        frustum_length = far - near;
+
+    out(0, 0) = x_scale;
+    out(1, 1) = y_scale;
+    out(2, 2) = -((far + near) / frustum_length);
+    out(3, 2) = -1.0;
+    out(2, 3) = -((2 * near * far) / frustum_length);
+
+    return out;
+}
 
 static inline void createBoard()
 {
@@ -57,7 +90,9 @@ int main() {
 
     glewInit();
 
-    glClearColor(0,0,0,1);
+    auto gizmos = Visualiser::create();
+
+    glClearColor(0.1f,0.1f,0.1f,1);
 
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -65,10 +100,7 @@ int main() {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
 
-//    rs2::pointcloud pc;
- //   rs2::points points; 
-
-    createBoard();
+//    createBoard();
     
     rs2::context rsContext;
 
@@ -82,12 +114,11 @@ int main() {
         pipe.start(cfg);
         pipelines.emplace_back(pipe);
 
-        rs_textures.push_back(rs2_gl_textures{ 0, 0, 0, false, false, false, false });
+        rs_textures.push_back(rs2_gl_textures());
     }
 
     rs2::colorizer colorizer;
     colorizer.set_option(RS2_OPTION_COLOR_SCHEME, 2);
-
     rs2::align align_to(RS2_STREAM_COLOR);
 
     // We are using StructuringElement for erode / dilate operations
@@ -114,9 +145,42 @@ int main() {
     // Skips some frames to allow for auto-exposure stabilization
     for (int i = 0; i < 10; i++) pipelines[0].wait_for_frames();
 
+    auto proj = createPerspectiveMatrix(45, 1920/1080.f, 0.01f, 5.0f);
+
+    auto position = Eigen::Vector3f{ 1.5f, 1.5f, 1.5f };
+    auto up = Eigen::Vector3f(0, 1, 0);
+
+    Eigen::Matrix3f camAxes;
+    camAxes.col(2) = (position).normalized();
+    camAxes.col(0) = up.cross(camAxes.col(2)).normalized();
+    camAxes.col(1) = camAxes.col(2).cross(camAxes.col(0)).normalized();
+    auto orientation = Eigen::Quaternionf(camAxes);
+    auto viewA = Eigen::Affine3f();
+    viewA.linear() = orientation.conjugate().toRotationMatrix();
+    viewA.translation() = -(viewA.linear() * position);
+
+    auto view = viewA.matrix();
+
     while (!glfwWindowShouldClose(window)) {
 
         glfwPollEvents(); 
+
+        // clear andd add 2m grid
+        gizmos->clear(); {
+            // grid 2mX2m 
+            gizmos->addLine({ 1, 0, 0, 1 }, { -1, 0, 0, 1 }, { 0, 0, 0, 1 });
+            gizmos->addLine({ 0, 0, 1, 1 }, { 0, 0, -1, 1 }, { 0, 0, 0, 1 });
+            gizmos->addLine({ 1, 0, 1, 1 }, { -1, 0, 1, 1 }, { 0, 0, 0, 1 });
+            gizmos->addLine({ 1, 0, 1, 1 }, { 1, 0, -1, 1 }, { 0, 0, 0, 1 });
+            gizmos->addLine({ -1, 0, -1, 1 }, { 1, 0, -1, 1 }, { 0, 0, 0, 1 });
+            gizmos->addLine({ -1, 0, -1, 1 }, { -1, 0, 1, 1 }, { 0, 0, 0, 1 });
+
+            for (int i = 0; i < 19; ++i) {
+                if (i == 9) continue;
+                gizmos->addLine({ -.9f + i * 0.1f, 0, 1, 1 }, { -.9f + i * 0.1f, 0, -1, 1 }, { 0.5f, 0.5f, 0.5f, 1 });
+                gizmos->addLine({ 1, 0, -.9f + i * 0.1f, 1 }, { -1, 0, -.9f + i * 0.1f, 1 }, { 0.5f, 0.5f, 0.5f, 1 });
+            }
+        }
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -131,69 +195,29 @@ int main() {
         std::vector<rs2::frame> new_frames;
         for (auto&& pipe : pipelines) {
             rs2::frameset frames;
-            if (pipe.poll_for_frames(&frames)) {
+            if ((rs_textures[index].rgbOn || rs_textures[index].depthOn) /*&& 
+                pipe.poll_for_frames(&frames)*/) {
 
-                auto depth = frames.get_depth_frame();
+                frames = pipe.wait_for_frames();
 
-                auto aligned_set = align_to.process(frames);
-                auto depth_processed = aligned_set.get_depth_frame();
+         //       auto aligned_set = align_to.process(frames);
+         //       auto depth_processed = aligned_set.get_depth_frame();
 
-                auto color_depth = colorizer.colorize(depth_processed);
-                copyFrameToGLTexture(rs_textures[index].depth, color_depth);
+                if (rs_textures[index].depthOn) {
+                    auto depth = frames.get_depth_frame();
+                    auto color_depth = colorizer.colorize(depth);// _processed);
+                    copyFrameToGLTexture(rs_textures[index].depth, color_depth);
 
-                auto color = frames.get_color_frame();
-                copyFrameToGLTexture(rs_textures[index].color, color);
-
-                // points = pc.calculate(depth);
-                // pc.map_to(color);
-
-                // this is so slow!
-                // will be a lot faster when moved to compute
-                if (rs_textures[index].enabled &&
-                    rs_textures[index].maskOn) {
-                    auto color_mat = frame_to_mat(aligned_set.get_color_frame());
-                    auto bw_depth = depth_processed.apply_filter(colorizer);
-
-                    // Generate "near" mask image:
-                    auto near = frame_to_mat(bw_depth);
-                    cvtColor(near, near, cv::COLOR_BGR2GRAY);
-                    // Take just values within range [180-255]
-                    // These will roughly correspond to near objects due to histogram equalization
-                    create_mask_from_depth(near, 180, cv::THRESH_BINARY);
-
-                    // Generate "far" mask image:
-                    auto far = frame_to_mat(bw_depth);
-                    cvtColor(far, far, cv::COLOR_BGR2GRAY);
-                    far.setTo(255, far == 0); // Note: 0 value does not indicate pixel near the camera, and requires special attention 
-                    create_mask_from_depth(far, 100, cv::THRESH_BINARY_INV);
-
-                    // GrabCut algorithm needs a mask with every pixel marked as either:
-                    // BGD, FGB, PR_BGD, PR_FGB
-                    cv::Mat mask;
-                    mask.create(near.size(), CV_8UC1);
-                    mask.setTo(cv::Scalar::all(cv::GC_BGD)); // Set "background" as default guess
-                    mask.setTo(cv::GC_PR_BGD, far == 0); // Relax this to "probably background" for pixels outside "far" region
-                    mask.setTo(cv::GC_FGD, near == 255); // Set pixels within the "near" region to "foreground"
-
-                    // Run Grab-Cut algorithm:
-                    cv::Mat bgModel, fgModel;
-                    grabCut(color_mat, mask, cv::Rect(), bgModel, fgModel, 1, cv::GC_INIT_WITH_MASK);
-
-                    // Extract foreground pixels based on refined mask from the algorithm
-                    cv::Mat3b foreground = cv::Mat3b::zeros(color_mat.rows, color_mat.cols);
-                    color_mat.copyTo(foreground, (mask == cv::GC_FGD) | (mask == cv::GC_PR_FGD));
-
-                    if (!rs_textures[index].grabCut)
-                        glGenTextures(1, &rs_textures[index].grabCut);
-                    if (foreground.data) {
-                        glBindTexture(GL_TEXTURE_2D, rs_textures[index].grabCut);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, foreground.cols, foreground.rows, 0, GL_RGB, GL_UNSIGNED_BYTE, foreground.data);
-                        glBindTexture(GL_TEXTURE_2D, 0);
-                    }
+                    // rs_textures[index].points = rs_textures[index].pc.calculate(rs_textures[index].depth);
                 }
+
+                if (rs_textures[index].rgbOn) {
+                    auto color = frames.get_color_frame();
+                    copyFrameToGLTexture(rs_textures[index].color, color);
+                }
+
+                // rs_textures[index].points = rs_textures[index].pc.calculate(rs_textures[index].depth);
+                // pc.map_to(color);
             }
 
             rs2::device rs_dev = pipe.get_active_profile().get_device();
@@ -202,15 +226,18 @@ int main() {
             if (rs_textures[index].enabled) {
                 ImGui::Checkbox(" - RBB", &rs_textures[index].rgbOn);
                 ImGui::Checkbox(" - D", &rs_textures[index].depthOn); 
-                ImGui::Checkbox(" - Mask", &rs_textures[index].maskOn);
+
+                ImGui::SliderFloat(" - Min", &rs_textures[index].depthMin, 0, 10);
+                ImGui::SliderFloat(" - Max", &rs_textures[index].depthMax, 0, 10);
+                ImGui::Checkbox(" - Locked", &rs_textures[index].locked);
+                ImGui::InputFloat(" - Y Offset", &rs_textures[index].cameraY);
 
                 if (rs_textures[index].rgbOn)
                     ImGui::Image((void*)(intptr_t)rs_textures[index].color, ImVec2(320, 240));
                 if (rs_textures[index].depthOn)
                     ImGui::Image((void*)(intptr_t)rs_textures[index].depth, ImVec2(320, 240));
-                if (rs_textures[index].maskOn)
-                    ImGui::Image((void*)(intptr_t)rs_textures[index].grabCut, ImVec2(320, 240));
 
+                gizmos->addTransform(rs_textures[index].transform.matrix(), 0.1f);
             }
                 ImGui::End();
             index++;
@@ -224,9 +251,13 @@ int main() {
         glViewport(0, 0, display_w, display_h);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        gizmos->draw(view, proj);
+
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
     }
+
+    gizmos->destroy();
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
