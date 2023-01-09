@@ -1,17 +1,14 @@
 #pragma once
 
-/*#include <glm/glm.hpp>
-#include <glm/ext.hpp>*/
-
 #include <Eigen/Core>
 #include <numbers>
 
-class Visualiser
+class Gizmos
 {
 public:
 
-	static Visualiser*	create(unsigned int a_maxLines = 32768, unsigned int a_maxTris = 32768);
-	static Visualiser*	getSingleton()	{	return sm_singleton;	}
+	static Gizmos*	create(unsigned int a_maxLines = 32768, unsigned int a_maxTris = 32768);
+	static Gizmos*	getSingleton()	{	return sm_singleton;	}
 	static void			destroy();
 
 	// removes all visualisers
@@ -78,8 +75,8 @@ public:
 	
 private:
 
-	Visualiser(unsigned int a_maxLines, unsigned int a_maxTris);
-	~Visualiser();
+	Gizmos(unsigned int a_maxLines, unsigned int a_maxTris);
+	~Gizmos();
 
 	struct VisualiserVertex
 	{
@@ -130,5 +127,5 @@ private:
 	unsigned int 	m_alphaTriVBO;
 	unsigned int 	m_alphaTriIBO;
 
-	static Visualiser*	sm_singleton;
+	static Gizmos*	sm_singleton;
 };

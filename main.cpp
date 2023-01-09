@@ -17,7 +17,8 @@
 #include <opencv2/aruco/charuco.hpp>
 #include <opencv2/imgcodecs.hpp>
 
-#include "Visualiser.h"
+#include "Gizmos.h"
+#include "Shader.h"
 
 #include  <Eigen/Geometry>
 
@@ -48,8 +49,75 @@ struct rs2_gl_textures {
 
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
 
+    GLuint vao = 0;
+    GLuint vbo = 0;
+    GLuint tbo = 0;
+
     rs2::pointcloud pc;
     rs2::points points; 
+
+    void updateBuffers() {
+
+        if (points.size() == 0) return;
+
+        // update positions
+        if (vbo == 0) {
+            glGenBuffers(1, &vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(rs2::vertex), points.get_vertices(), GL_DYNAMIC_DRAW);
+        }
+        else {
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, points.size() * sizeof(rs2::vertex), points.get_vertices());
+        }
+
+        // update positions
+    //    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    //    glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(rs2::vertex), points.get_vertices(), GL_DYNAMIC_DRAW);
+
+     //   if (tbo == 0)
+    //        glGenBuffers(1, &tbo);
+
+        // update textures
+        if (tbo == 0) {
+            glGenBuffers(1, &tbo);
+            glBindBuffer(GL_ARRAY_BUFFER, tbo);
+            glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(rs2::texture_coordinate), points.get_texture_coordinates(), GL_DYNAMIC_DRAW);
+        }
+        else {
+            glBindBuffer(GL_ARRAY_BUFFER, tbo);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, points.size() * sizeof(rs2::texture_coordinate), points.get_texture_coordinates());
+        }
+    //    glBindBuffer(GL_ARRAY_BUFFER, tbo);
+    //    glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(rs2::texture_coordinate), points.get_texture_coordinates(), GL_DYNAMIC_DRAW);
+
+        if (vao == 0) {
+            glGenVertexArrays(1, &vao);
+            glBindVertexArray(vao);
+
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+            glBindBuffer(GL_ARRAY_BUFFER, tbo);
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+            glBindVertexArray(0);
+        }
+    }
+
+    void draw(Shader::UniformBase* a_modelUniform, const Eigen::Affine3f& captureSpaceMatrix) {
+
+        if (points.size() == 0) return;
+
+        a_modelUniform->bind((captureSpaceMatrix * transform).matrix());
+
+        glBindTexture(GL_TEXTURE_2D, color);
+
+        glBindVertexArray(vao);
+        glDrawArrays(GL_POINTS, 0, points.size());
+    }
 };
 
 static Eigen::Matrix4f createPerspectiveMatrix(float yFoV, float aspect, float near, float far)
@@ -79,6 +147,22 @@ static inline void createBoard()
     cv::imwrite("BoardImage.jpg", boardImage);
 }
 
+auto CalculateViewMatrixLookAt(const auto& from, const auto& to) {
+
+    auto direction = from - to;
+
+    Eigen::Matrix3f camAxes;
+    camAxes.col(2) = (direction).normalized();
+    camAxes.col(0) = Eigen::Vector3f::UnitY().cross(camAxes.col(2)).normalized();
+    camAxes.col(1) = camAxes.col(2).cross(camAxes.col(0)).normalized();
+    auto orientation = Eigen::Quaternionf(camAxes);
+    auto viewA = Eigen::Affine3f();
+    viewA.linear() = orientation.conjugate().toRotationMatrix();
+    viewA.translation() = -(viewA.linear() * from);
+
+    return viewA.matrix();
+}
+
 int main() {
 
     glfwInit();
@@ -90,7 +174,7 @@ int main() {
 
     glewInit();
 
-    auto gizmos = Visualiser::create();
+    auto gizmos = Gizmos::create();
 
     glClearColor(0.1f,0.1f,0.1f,1);
 
@@ -99,6 +183,39 @@ int main() {
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
+
+    Eigen::Vector3f eyePosition = Eigen::Vector3f::Ones();
+    Eigen::Vector3f eyeTarget = Eigen::Vector3f::Zero();
+    Eigen::Matrix4f viewMatrix = CalculateViewMatrixLookAt(eyePosition, eyeTarget);
+    Eigen::Matrix4f projectionMatrix = createPerspectiveMatrix(45, 1920 / 1080.f, 0.01f, 5.0f);
+
+    Shader* pcShader = new Shader("PC");
+    bool bSuccess = pcShader->compileShaderFromFile(Shader::Stage::Vertex, "./shaders/pc.vert");
+    if (!bSuccess)
+    std::cout << pcShader->getLastError() << std::endl;
+    bSuccess = pcShader->compileShaderFromFile(Shader::Stage::Geometry, "./shaders/pc.geom");
+    if (!bSuccess)
+        std::cout << pcShader->getLastError() << std::endl;
+    bSuccess = pcShader->compileShaderFromFile(Shader::Stage::Fragment, "./shaders/pc.frag");
+    if (!bSuccess)
+        std::cout << pcShader->getLastError() << std::endl;
+    bSuccess = pcShader->linkProgram();
+    if (!bSuccess)
+        std::cout << pcShader->getLastError() << std::endl;
+
+    Shader::UniformBase* modelUniform = pcShader->getUniform("Model");
+    Shader::UniformBase* viewUniform = pcShader->getUniform("View");
+    Shader::UniformBase* projectionUniform = pcShader->getUniform("Projection");
+    Shader::UniformBase* pointSizeUniform = pcShader->getUniform("PointSize");
+    Shader::UniformBase* pointCloudColourUniform = pcShader->getUniform("PointCloudColour");
+
+    pointCloudColourUniform->bind((unsigned int)0);
+
+    float pointSize = 0.1f;
+
+    Eigen::Affine3f captureSpaceMatrix = Eigen::Affine3f::Identity();
+
+    captureSpaceMatrix.rotate(Eigen::AngleAxisf(std::numbers::pi_v<float>, Eigen::Vector3f::UnitX()));
 
 //    createBoard();
     
@@ -145,22 +262,6 @@ int main() {
     // Skips some frames to allow for auto-exposure stabilization
     for (int i = 0; i < 10; i++) pipelines[0].wait_for_frames();
 
-    auto proj = createPerspectiveMatrix(45, 1920/1080.f, 0.01f, 5.0f);
-
-    auto position = Eigen::Vector3f{ 1.5f, 1.5f, 1.5f };
-    auto up = Eigen::Vector3f(0, 1, 0);
-
-    Eigen::Matrix3f camAxes;
-    camAxes.col(2) = (position).normalized();
-    camAxes.col(0) = up.cross(camAxes.col(2)).normalized();
-    camAxes.col(1) = camAxes.col(2).cross(camAxes.col(0)).normalized();
-    auto orientation = Eigen::Quaternionf(camAxes);
-    auto viewA = Eigen::Affine3f();
-    viewA.linear() = orientation.conjugate().toRotationMatrix();
-    viewA.translation() = -(viewA.linear() * position);
-
-    auto view = viewA.matrix();
-
     while (!glfwWindowShouldClose(window)) {
 
         glfwPollEvents(); 
@@ -188,6 +289,7 @@ int main() {
         
         if (ImGui::BeginMainMenuBar()) {
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::SliderFloat("Point Size", &pointSize, 0, 1);
             ImGui::EndMainMenuBar();
         }
 
@@ -203,21 +305,20 @@ int main() {
          //       auto aligned_set = align_to.process(frames);
          //       auto depth_processed = aligned_set.get_depth_frame();
 
+                if (rs_textures[index].rgbOn) {
+                    auto color = frames.get_color_frame();
+                    copyFrameToGLTexture(rs_textures[index].color, color);
+
+                    rs_textures[index].pc.map_to(color);
+                }
+
                 if (rs_textures[index].depthOn) {
                     auto depth = frames.get_depth_frame();
                     auto color_depth = colorizer.colorize(depth);// _processed);
                     copyFrameToGLTexture(rs_textures[index].depth, color_depth);
 
-                    // rs_textures[index].points = rs_textures[index].pc.calculate(rs_textures[index].depth);
+                    rs_textures[index].points = rs_textures[index].pc.calculate(depth);
                 }
-
-                if (rs_textures[index].rgbOn) {
-                    auto color = frames.get_color_frame();
-                    copyFrameToGLTexture(rs_textures[index].color, color);
-                }
-
-                // rs_textures[index].points = rs_textures[index].pc.calculate(rs_textures[index].depth);
-                // pc.map_to(color);
             }
 
             rs2::device rs_dev = pipe.get_active_profile().get_device();
@@ -232,6 +333,9 @@ int main() {
                 ImGui::Checkbox(" - Locked", &rs_textures[index].locked);
                 ImGui::InputFloat(" - Y Offset", &rs_textures[index].cameraY);
 
+                auto pcSize = rs_textures[index].points.size();
+                ImGui::LabelText(" - Points", "%d", pcSize);
+
                 if (rs_textures[index].rgbOn)
                     ImGui::Image((void*)(intptr_t)rs_textures[index].color, ImVec2(320, 240));
                 if (rs_textures[index].depthOn)
@@ -239,24 +343,70 @@ int main() {
 
                 gizmos->addTransform(rs_textures[index].transform.matrix(), 0.1f);
             }
-                ImGui::End();
+            ImGui::End();
+
+            rs_textures[index].updateBuffers();
+
             index++;
         }
 
-
         ImGui::Render();
+
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+            ImGui::GetIO().DeltaTime;
+
+            auto a = Eigen::AngleAxisf(std::numbers::pi_v<float> * ImGui::GetIO().DeltaTime, Eigen::Vector3f::UnitY());
+
+            eyePosition = a * eyePosition;
+        }
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+            ImGui::GetIO().DeltaTime;
+
+            auto a = Eigen::AngleAxisf(std::numbers::pi_v<float> * -ImGui::GetIO().DeltaTime, Eigen::Vector3f::UnitY());
+
+            eyePosition = a * eyePosition;
+        }
+
+        auto dir = (eyeTarget - eyePosition).normalized();
+        auto right = dir.cross(Eigen::Vector3f::UnitY()).normalized();
+
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+            ImGui::GetIO().DeltaTime;
+
+            auto a = Eigen::AngleAxisf(std::numbers::pi_v<float> *ImGui::GetIO().DeltaTime, right);
+
+            eyePosition = a * eyePosition;
+        }
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+            ImGui::GetIO().DeltaTime;
+
+            auto a = Eigen::AngleAxisf(std::numbers::pi_v<float> *-ImGui::GetIO().DeltaTime, right);
+
+            eyePosition = a * eyePosition;
+        }
+
+        viewMatrix = CalculateViewMatrixLookAt(eyePosition, eyeTarget);
 
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        gizmos->draw(view, proj);
+        gizmos->draw(viewMatrix, projectionMatrix);
+
+        pcShader->bind();
+        pointSizeUniform->bind(pointSize);
+        viewUniform->bind(viewMatrix);
+        projectionUniform->bind(projectionMatrix);
+        for (auto& cam : rs_textures)
+            cam.draw(modelUniform, captureSpaceMatrix);
+        pcShader->unBind();
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
     }
 
+    delete pcShader;
     gizmos->destroy();
 
     ImGui_ImplOpenGL3_Shutdown();

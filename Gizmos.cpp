@@ -1,9 +1,9 @@
-#include "Visualiser.h"
+#include "Gizmos.h"
 #include <GL/glew.h>
 
-Visualiser* Visualiser::sm_singleton = nullptr;
+Gizmos* Gizmos::sm_singleton = nullptr;
 
-Visualiser::Visualiser(unsigned int a_uiMaxLines, unsigned int a_uiMaxTris)
+Gizmos::Gizmos(unsigned int a_uiMaxLines, unsigned int a_uiMaxTris)
 	: m_maxLines(a_uiMaxLines),
 	m_lineCount(0),
 	m_lines(new VisualiserLine[a_uiMaxLines]),
@@ -129,7 +129,7 @@ Visualiser::Visualiser(unsigned int a_uiMaxLines, unsigned int a_uiMaxTris)
 	glBindVertexArray(0);
 }
 
-Visualiser::~Visualiser()
+Gizmos::~Gizmos()
 {
 	delete[] m_lines;
 	delete[] m_tris;
@@ -148,20 +148,20 @@ Visualiser::~Visualiser()
 	glDeleteProgram(m_shaderProgram);
 }
 
-Visualiser* Visualiser::create(unsigned int a_maxLines /* = 16384 */, unsigned int a_maxTris /* = 16384 */)
+Gizmos* Gizmos::create(unsigned int a_maxLines /* = 16384 */, unsigned int a_maxTris /* = 16384 */)
 {
 	if (sm_singleton == nullptr)
-		sm_singleton = new Visualiser(a_maxLines,a_maxTris);
+		sm_singleton = new Gizmos(a_maxLines,a_maxTris);
 	return sm_singleton;
 }
 
-void Visualiser::destroy()
+void Gizmos::destroy()
 {
 	delete sm_singleton;
 	sm_singleton = nullptr;
 }
 
-void Visualiser::clear()
+void Gizmos::clear()
 {
 	m_lineCount = 0;
 	m_triCount = 0;
@@ -170,7 +170,7 @@ void Visualiser::clear()
 
 // Adds 3 unit-length lines (red,green,blue) representing the 3 axis of a transform, 
 // at the transform's translation. Optional scale available.
-void Visualiser::addTransform(const Eigen::Matrix4f& a_transform, float a_scale /* = 1.0f */)
+void Gizmos::addTransform(const Eigen::Matrix4f& a_transform, float a_scale /* = 1.0f */)
 {
 	auto translate = a_transform.col(3);
 	auto xAxis = translate + a_transform.col(0) * a_scale;
@@ -186,7 +186,7 @@ void Visualiser::addTransform(const Eigen::Matrix4f& a_transform, float a_scale 
 	addLine(translate, zAxis, blue, blue);
 }
 
-void Visualiser::addAABB(const Eigen::Vector4f& a_center, 
+void Gizmos::addAABB(const Eigen::Vector4f& a_center, 
 	const Eigen::Vector4f& a_extents, 
 	const Eigen::Vector4f& a_colour, 
 	const Eigen::Matrix4f* a_transform /* = nullptr */)
@@ -231,7 +231,7 @@ void Visualiser::addAABB(const Eigen::Vector4f& a_center,
 	addLine(verts[3], verts[7], a_colour, a_colour);
 }
 
-void Visualiser::addAABBFilled(const Eigen::Vector4f& a_center, 
+void Gizmos::addAABBFilled(const Eigen::Vector4f& a_center, 
 	const Eigen::Vector4f& a_extents, 
 	const Eigen::Vector4f& a_fillColour, 
 	const Eigen::Matrix4f* a_transform /* = nullptr */)
@@ -302,7 +302,7 @@ void Visualiser::addAABBFilled(const Eigen::Vector4f& a_center,
 	addTri(verts[6], verts[2], verts[7], a_fillColour);
 }
 
-void Visualiser::addCylinderFilled(const Eigen::Vector4f& a_center, float a_radius, float a_halfLength,
+void Gizmos::addCylinderFilled(const Eigen::Vector4f& a_center, float a_radius, float a_halfLength,
 	unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
 	Eigen::Vector4f white(1,1,1,1);
@@ -341,7 +341,7 @@ void Visualiser::addCylinderFilled(const Eigen::Vector4f& a_center, float a_radi
 	}
 }
 
-void Visualiser::addRing(const Eigen::Vector4f& a_center, float a_innerRadius, float a_outerRadius,
+void Gizmos::addRing(const Eigen::Vector4f& a_center, float a_innerRadius, float a_outerRadius,
 	unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
 	Eigen::Vector4f solidColour = a_fillColour;
@@ -381,7 +381,7 @@ void Visualiser::addRing(const Eigen::Vector4f& a_center, float a_innerRadius, f
 	}
 }
 
-void Visualiser::addDisk(const Eigen::Vector4f& a_center, float a_radius,
+void Gizmos::addDisk(const Eigen::Vector4f& a_center, float a_radius,
 	unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
 	Eigen::Vector4f vSolid = a_fillColour;
@@ -413,7 +413,7 @@ void Visualiser::addDisk(const Eigen::Vector4f& a_center, float a_radius,
 	}
 }
 
-void Visualiser::addArc(const Eigen::Vector4f& a_center,
+void Gizmos::addArc(const Eigen::Vector4f& a_center,
 	float a_radius, float a_arcHalfAngle, float a_rotation,
 	unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
@@ -462,7 +462,7 @@ void Visualiser::addArc(const Eigen::Vector4f& a_center,
 	}
 }
 
-void Visualiser::addArcRing(const Eigen::Vector4f& a_center,
+void Gizmos::addArcRing(const Eigen::Vector4f& a_center,
 	float a_innerRadius, float a_outerRadius, float a_arcHalfAngle, float a_rotation, 
 	unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
@@ -523,7 +523,7 @@ void Visualiser::addArcRing(const Eigen::Vector4f& a_center,
 	}
 }
 
-void Visualiser::addSphere(const Eigen::Vector4f& a_center, float a_radius, int a_rings, int a_segments, const Eigen::Vector4f& a_fillColour, 
+void Gizmos::addSphere(const Eigen::Vector4f& a_center, float a_radius, int a_rings, int a_segments, const Eigen::Vector4f& a_fillColour, 
 								const Eigen::Matrix4f* a_transform /*= nullptr*/, float a_longitudeMin /*= 0.0f*/, float a_longitudeMax /*= pi<float>() * 2*/, 
 								float a_latitudeMin /*= -half_pi<float>()*/, float a_latitudeMax /*= half_pi<float>()*/)
 {
@@ -592,7 +592,7 @@ void Visualiser::addSphere(const Eigen::Vector4f& a_center, float a_radius, int 
 	delete[] v4Array;	
 }
 
-void Visualiser::addHermiteSpline(const Eigen::Vector4f& a_rvStart, const Eigen::Vector4f& a_rvEnd,
+void Gizmos::addHermiteSpline(const Eigen::Vector4f& a_rvStart, const Eigen::Vector4f& a_rvEnd,
 	const Eigen::Vector4f& a_rvTangentStart, const Eigen::Vector4f& a_rvTangentEnd, unsigned int a_uiSegment, const Eigen::Vector4f& a_colour)
 {
 	a_uiSegment = a_uiSegment > 1 ? a_uiSegment : 1;
@@ -617,13 +617,13 @@ void Visualiser::addHermiteSpline(const Eigen::Vector4f& a_rvStart, const Eigen:
 	}
 }
 
-void Visualiser::addLine(const Eigen::Vector4f& a_rv0,  const Eigen::Vector4f& a_rv1, 
+void Gizmos::addLine(const Eigen::Vector4f& a_rv0,  const Eigen::Vector4f& a_rv1, 
 	const Eigen::Vector4f& a_colour)
 {
 	addLine(a_rv0,a_rv1,a_colour,a_colour);
 }
 
-void Visualiser::addLine(const Eigen::Vector4f& a_v0, const Eigen::Vector4f& a_v1, 
+void Gizmos::addLine(const Eigen::Vector4f& a_v0, const Eigen::Vector4f& a_v1, 
 	const Eigen::Vector4f& a_colour0, const Eigen::Vector4f& a_colour1)
 {
 	if (m_lineCount < m_maxLines)
@@ -637,7 +637,7 @@ void Visualiser::addLine(const Eigen::Vector4f& a_v0, const Eigen::Vector4f& a_v
 	}
 }
 
-void Visualiser::addTri(const Eigen::Vector4f& a_v0, const Eigen::Vector4f& a_v1, const Eigen::Vector4f& a_v2, const Eigen::Vector4f& a_colour)
+void Gizmos::addTri(const Eigen::Vector4f& a_v0, const Eigen::Vector4f& a_v1, const Eigen::Vector4f& a_v2, const Eigen::Vector4f& a_colour)
 {
 	if (a_colour[3] == 1)
 	{
@@ -669,7 +669,7 @@ void Visualiser::addTri(const Eigen::Vector4f& a_v0, const Eigen::Vector4f& a_v1
 	}
 }
 
-void Visualiser::draw(const Eigen::Matrix4f& a_view, const Eigen::Matrix4f& a_projection)
+void Gizmos::draw(const Eigen::Matrix4f& a_view, const Eigen::Matrix4f& a_projection)
 {
 	if (m_lineCount > 0 || m_triCount > 0 || m_alphaTriCount > 0)
 	{
