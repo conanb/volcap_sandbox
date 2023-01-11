@@ -10,5 +10,8 @@ uniform mat4 Model;
 
 void main() {
 	TexCoord = UV;
-	gl_Position = View * Model * vec4(Position, 1);
+
+	vec3 P = Position * vec3(1,-1,1);
+
+	gl_Position = View * Model * vec4(P,1);
 }

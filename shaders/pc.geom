@@ -8,8 +8,9 @@ in Vertex {
 
 layout( location = 0 ) out vec2 TexCoords; 
 
+uniform float CutoffMin;
+uniform float CutoffMax;
 uniform float PointSize;
-
 uniform mat4 Projection;
 
 void main() {    
@@ -18,25 +19,29 @@ void main() {
 
     vec4 center = gl_in[0].gl_Position;
 
-     // a: left-bottom 
-    vec2 va = center.xy + vec2(-0.5, -0.5) * PointSize;
-    gl_Position = Projection * vec4(va, center.zw);
-    EmitVertex();  
-  
-    // b: left-top
-    vec2 vb = center.xy + vec2(-0.5, 0.5) * PointSize;
-    gl_Position = Projection * vec4(vb, center.zw);
-    EmitVertex();  
-  
-    // d: right-bottom
-    vec2 vd = center.xy + vec2(0.5, -0.5) * PointSize;
-    gl_Position = Projection * vec4(vd, center.zw);
-    EmitVertex();  
+    if (abs(center.z) <= CutoffMax &&
+        abs(center.z) >= CutoffMin) {
 
-    // c: right-top
-    vec2 vc = center.xy + vec2(0.5, 0.5) * PointSize;
-    gl_Position = Projection * vec4(vc, center.zw);
-    EmitVertex();
+         // a: left-bottom 
+        vec2 va = center.xy + vec2(-0.5, -0.5) * PointSize;
+        gl_Position = Projection * vec4(va, center.zw);
+        EmitVertex();  
+  
+        // b: left-top
+        vec2 vb = center.xy + vec2(-0.5, 0.5) * PointSize;
+        gl_Position = Projection * vec4(vb, center.zw);
+        EmitVertex();  
+  
+        // d: right-bottom
+        vec2 vd = center.xy + vec2(0.5, -0.5) * PointSize;
+        gl_Position = Projection * vec4(vd, center.zw);
+        EmitVertex();  
 
-    EndPrimitive(); 
+        // c: right-top
+        vec2 vc = center.xy + vec2(0.5, 0.5) * PointSize;
+        gl_Position = Projection * vec4(vc, center.zw);
+        EmitVertex();
+
+        EndPrimitive(); 
+    }
 }  

@@ -66,6 +66,9 @@ public:
 		void			bind(const Eigen::Vector2i& iv);
 		void			bind(const Eigen::Vector3i& iv);
 		void			bind(const Eigen::Vector4i& iv);
+		void			bind(const Eigen::Vector<unsigned int, 2>& iv);
+		void			bind(const Eigen::Vector<unsigned int, 3>& iv);
+		void			bind(const Eigen::Vector<unsigned int, 4>& iv);
 		void			bind(const Eigen::Matrix2f& m);
 		void			bind(const Eigen::Matrix3f& m);
 		void			bind(const Eigen::Matrix4f& m);
@@ -79,6 +82,9 @@ public:
 		void			bind(unsigned int a_count, const Eigen::Vector2i* iv);
 		void			bind(unsigned int a_count, const Eigen::Vector3i* iv);
 		void			bind(unsigned int a_count, const Eigen::Vector4i* iv);
+		void			bind(unsigned int a_count, const Eigen::Vector<unsigned int, 2>* iv);
+		void			bind(unsigned int a_count, const Eigen::Vector<unsigned int, 3>* iv);
+		void			bind(unsigned int a_count, const Eigen::Vector<unsigned int, 4>* iv);
 		void			bind(unsigned int a_count, const Eigen::Matrix2f* m);
 		void			bind(unsigned int a_count, const Eigen::Matrix3f* m);
 		void			bind(unsigned int a_count, const Eigen::Matrix4f* m);

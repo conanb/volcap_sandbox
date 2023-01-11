@@ -18,60 +18,60 @@ public:
 	void			draw(const Eigen::Matrix4f& a_view, const Eigen::Matrix4f& a_projection);
 
 	// Adds a single debug line
-	void			addLine(const Eigen::Vector4f& a_v0,  const Eigen::Vector4f& a_v1, 
+	void			addLine(const Eigen::Vector3f& a_v0,  const Eigen::Vector3f& a_v1,
 							const Eigen::Vector4f& a_colour);
 
 	// Adds a single debug line
-	void			addLine(const Eigen::Vector4f& a_v0, const Eigen::Vector4f& a_v1, 
+	void			addLine(const Eigen::Vector3f& a_v0, const Eigen::Vector3f& a_v1,
 							const Eigen::Vector4f& a_colour0, const Eigen::Vector4f& a_colour1);
 
 	// Adds a triangle.
-	void			addTri(const Eigen::Vector4f& a_v0, const Eigen::Vector4f& a_v1, const Eigen::Vector4f& a_v2, const Eigen::Vector4f& a_colour);
+	void			addTri(const Eigen::Vector3f& a_v0, const Eigen::Vector3f& a_v1, const Eigen::Vector3f& a_v2, const Eigen::Vector4f& a_colour);
 
 	// Adds 3 unit-length lines (red,green,blue) representing the 3 axis of a transform, 
 	// at the transform's translation. Optional scale available.
 	void			addTransform(const Eigen::Matrix4f& a_transform, float a_scale = 1.0f);
 	
 	// Adds a wireframe Axis-Aligned Bounding-Box with optional transform for rotation/translation.
-	void			addAABB(const Eigen::Vector4f& a_center, const Eigen::Vector4f& a_extents, 
+	void			addAABB(const Eigen::Vector3f& a_center, const Eigen::Vector3f& a_extents,
 							const Eigen::Vector4f& a_colour, const Eigen::Matrix4f* a_transform = nullptr);
 
 	// Adds an Axis-Aligned Bounding-Box with optional transform for rotation.
-	void			addAABBFilled(const Eigen::Vector4f& a_center, const Eigen::Vector4f& a_extents, 
+	void			addAABBFilled(const Eigen::Vector3f& a_center, const Eigen::Vector3f& a_extents,
 								const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform = nullptr);
 
 	// Adds a cylinder aligned to the Y-axis with optional transform for rotation.
-	void			addCylinderFilled(const Eigen::Vector4f& a_center, float a_radius, float a_halfLength,
+	void			addCylinderFilled(const Eigen::Vector3f& a_center, float a_radius, float a_halfLength,
 									unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform = nullptr);
 
 	// Adds a double-sided hollow ring in the XZ axis with optional transform for rotation.
 	// If a_rvFilLColour.w == 0 then only an outer and inner line is drawn.
-	void			addRing(const Eigen::Vector4f& a_center, float a_innerRadius, float a_outerRadius,
+	void			addRing(const Eigen::Vector3f& a_center, float a_innerRadius, float a_outerRadius,
 							unsigned int a_uiSegments, const Eigen::Vector4f& a_rvFillColour, const Eigen::Matrix4f* a_transform = nullptr);
 
 	// Adds a double-sided disk in the XZ axis with optional transform for rotation.
 	// If a_rvFilLColour.w == 0 then only an outer line is drawn.
-	void			addDisk(const Eigen::Vector4f& a_center, float a_radius,
+	void			addDisk(const Eigen::Vector3f& a_center, float a_radius,
 							unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform = nullptr);
 
 	// Adds an arc, around the Y-axis
 	// If a_rvFilLColour.w == 0 then only an outer line is drawn.
-	void			addArc(const Eigen::Vector4f& a_center, float a_radius, float a_arcHalfAngle, float a_rotation,
+	void			addArc(const Eigen::Vector3f& a_center, float a_radius, float a_arcHalfAngle, float a_rotation,
 							unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform = nullptr);
 
 	// Adds an arc, around the Y-axis, starting at the inner radius and extending to the outer radius
 	// If a_rvFilLColour.w == 0 then only an outer line is drawn.
-	void			addArcRing(const Eigen::Vector4f& a_center, float a_innerRadius, float a_outerRadius, float a_arcHalfAngle, float a_rotation, 
+	void			addArcRing(const Eigen::Vector3f& a_center, float a_innerRadius, float a_outerRadius, float a_arcHalfAngle, float a_rotation,
 								unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform = nullptr);
 
 	// Adds a Sphere at a given position, with a given number of rows, and columns, radius and a max and min long and latitude
-	void			addSphere(const Eigen::Vector4f& a_center, float a_radius, int a_rings, int a_segments, const Eigen::Vector4f& a_fillColour, 
+	void			addSphere(const Eigen::Vector3f& a_center, float a_radius, int a_rings, int a_segments, const Eigen::Vector4f& a_fillColour,
 								const Eigen::Matrix4f* a_transform = nullptr, float a_longitudeMin = 0.0f, float a_longitudeMax = std::numbers::pi_v<float> * 2,
 								float a_latitudeMin = -std::numbers::pi_v<float> * 0.5f, float a_latitudeMax = std::numbers::pi_v<float> * 0.5f );
 
 	// Adds a single Hermite spline curve
-	void			addHermiteSpline(const Eigen::Vector4f& a_start, const Eigen::Vector4f& a_end,
-									const Eigen::Vector4f& a_tangentStart, const Eigen::Vector4f& a_tangentEnd, unsigned int a_segments, const Eigen::Vector4f& a_colour);
+	void			addHermiteSpline(const Eigen::Vector3f& a_start, const Eigen::Vector3f& a_end,
+									const Eigen::Vector3f& a_tangentStart, const Eigen::Vector3f& a_tangentEnd, unsigned int a_segments, const Eigen::Vector4f& a_colour);
 	
 private:
 
@@ -80,8 +80,10 @@ private:
 
 	struct VisualiserVertex
 	{
-		Eigen::Vector4f position;
-		Eigen::Vector4f colour;
+		// 
+	//	Eigen::Vector3f position;
+	//	Eigen::Vector4f colour;
+		float x, y, z, r, g, b, a;
 	};
 
 	struct VisualiserLine

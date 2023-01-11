@@ -1,5 +1,6 @@
 #include "Gizmos.h"
 #include <GL/glew.h>
+#include <Eigen/Geometry>
 
 Gizmos* Gizmos::sm_singleton = nullptr;
 
@@ -17,7 +18,7 @@ Gizmos::Gizmos(unsigned int a_uiMaxLines, unsigned int a_uiMaxTris)
 
 	// create shaders
 	const char* vsSource = "#version 330\n \
-					 in vec4 Position; \
+					 in vec3 Position; \
 					 in vec4 Colour; \
 					 out vec4 vColour; \
 					 uniform mat4 View; \
@@ -25,7 +26,7 @@ Gizmos::Gizmos(unsigned int a_uiMaxLines, unsigned int a_uiMaxTris)
 					 void main() \
 					 { \
 						 vColour = Colour; \
-						 gl_Position = Projection * View * Position; \
+						 gl_Position = Projection * View * vec4(Position,1); \
 					 }";
 
 	const char* fsSource = "#version 330\n \
@@ -55,19 +56,19 @@ Gizmos::Gizmos(unsigned int a_uiMaxLines, unsigned int a_uiMaxTris)
 	// create VBOs
 	glGenBuffers( 1, &m_lineVBO );
 	glBindBuffer(GL_ARRAY_BUFFER, m_lineVBO);
-	glBufferData(GL_ARRAY_BUFFER, m_maxLines * sizeof(VisualiserLine), m_lines, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, m_maxLines * 2 * sizeof(VisualiserVertex), m_lines, GL_DYNAMIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	glGenBuffers( 1, &m_triVBO );
 	glBindBuffer(GL_ARRAY_BUFFER, m_triVBO);
-	glBufferData(GL_ARRAY_BUFFER, m_maxTris * sizeof(VisualiserTri), m_tris, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, m_maxTris * 3 * sizeof(VisualiserVertex), m_tris, GL_DYNAMIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	glGenBuffers( 1, &m_alphaTriVBO );
 	glBindBuffer(GL_ARRAY_BUFFER, m_alphaTriVBO);
-	glBufferData(GL_ARRAY_BUFFER, m_maxTris * sizeof(VisualiserTri), m_alphaTris, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, m_maxTris * 3 * sizeof(VisualiserVertex), m_alphaTris, GL_DYNAMIC_DRAW);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -105,8 +106,8 @@ Gizmos::Gizmos(unsigned int a_uiMaxLines, unsigned int a_uiMaxTris)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_lineIBO);
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(VisualiserVertex), 0);
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_TRUE, sizeof(VisualiserVertex), ((char*)0) + 16);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VisualiserVertex), 0);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_TRUE, sizeof(VisualiserVertex), ((char*)0) + 12);
 
 	glGenVertexArrays(1, &m_triVAO);
 	glBindVertexArray(m_triVAO);
@@ -114,8 +115,8 @@ Gizmos::Gizmos(unsigned int a_uiMaxLines, unsigned int a_uiMaxTris)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_triIBO);
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(VisualiserVertex), 0);
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_TRUE, sizeof(VisualiserVertex), ((char*)0) + 16);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VisualiserVertex), 0);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_TRUE, sizeof(VisualiserVertex), ((char*)0) + 12);
 
 	glGenVertexArrays(1, &m_alphaTriVAO);
 	glBindVertexArray(m_alphaTriVAO);
@@ -123,8 +124,8 @@ Gizmos::Gizmos(unsigned int a_uiMaxLines, unsigned int a_uiMaxTris)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_alphaTriIBO);
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(VisualiserVertex), 0);
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_TRUE, sizeof(VisualiserVertex), ((char*)0) + 16);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VisualiserVertex), 0);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_TRUE, sizeof(VisualiserVertex), ((char*)0) + 12);
 
 	glBindVertexArray(0);
 }
@@ -172,10 +173,10 @@ void Gizmos::clear()
 // at the transform's translation. Optional scale available.
 void Gizmos::addTransform(const Eigen::Matrix4f& a_transform, float a_scale /* = 1.0f */)
 {
-	auto translate = a_transform.col(3);
-	auto xAxis = translate + a_transform.col(0) * a_scale;
-	auto yAxis = translate + a_transform.col(1) * a_scale;
-	auto zAxis = translate + a_transform.col(2) * a_scale;
+	auto translate = a_transform.col(3).head<3>();
+	auto xAxis = translate + a_transform.col(0).head<3>() * a_scale;
+	auto yAxis = translate + a_transform.col(1).head<3>() * a_scale;
+	auto zAxis = translate + a_transform.col(2).head<3>() * a_scale;
 
 	Eigen::Vector4f red(1,0,0,1);
 	Eigen::Vector4f green(0,1,0,1);
@@ -186,21 +187,23 @@ void Gizmos::addTransform(const Eigen::Matrix4f& a_transform, float a_scale /* =
 	addLine(translate, zAxis, blue, blue);
 }
 
-void Gizmos::addAABB(const Eigen::Vector4f& a_center, 
-	const Eigen::Vector4f& a_extents, 
+void Gizmos::addAABB(const Eigen::Vector3f& a_center,
+	const Eigen::Vector3f& a_extents,
 	const Eigen::Vector4f& a_colour, 
 	const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
-	Eigen::Vector4f verts[8];
-	Eigen::Vector4f x(a_extents[0], 0, 0, 0);
-	Eigen::Vector4f y(0, a_extents[1], 0, 0);
-	Eigen::Vector4f z(0, 0, a_extents[2], 0);
+	Eigen::Vector3f verts[8];
+	Eigen::Vector3f x(a_extents[0], 0, 0);
+	Eigen::Vector3f y(0, a_extents[1], 0);
+	Eigen::Vector3f z(0, 0, a_extents[2]);
 
 	if (a_transform != nullptr)
 	{
-		x = *a_transform * x;
-		y = *a_transform * y;
-		z = *a_transform * z;
+		Eigen::Affine3f aff(*a_transform);
+
+		x = aff * x;
+		y = aff * y;
+		z = aff * z;
 	}
 
 	// top verts
@@ -231,21 +234,23 @@ void Gizmos::addAABB(const Eigen::Vector4f& a_center,
 	addLine(verts[3], verts[7], a_colour, a_colour);
 }
 
-void Gizmos::addAABBFilled(const Eigen::Vector4f& a_center, 
-	const Eigen::Vector4f& a_extents, 
+void Gizmos::addAABBFilled(const Eigen::Vector3f& a_center,
+	const Eigen::Vector3f& a_extents,
 	const Eigen::Vector4f& a_fillColour, 
 	const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
-	Eigen::Vector4f verts[8];
-	Eigen::Vector4f x(a_extents[0], 0, 0, 0);
-	Eigen::Vector4f y(0, a_extents[1], 0, 0);
-	Eigen::Vector4f z(0, 0, a_extents[2], 0);
+	Eigen::Vector3f verts[8];
+	Eigen::Vector3f x(a_extents[0], 0, 0);
+	Eigen::Vector3f y(0, a_extents[1], 0);
+	Eigen::Vector3f z(0, 0, a_extents[2]);
 
 	if (a_transform != nullptr)
 	{
-		x = *a_transform * x;
-		y = *a_transform * y;
-		z = *a_transform * z;
+		Eigen::Affine3f aff(*a_transform);
+
+		x = aff * x;
+		y = aff * y;
+		z = aff * z;
 	}
 
 	// top verts
@@ -302,7 +307,7 @@ void Gizmos::addAABBFilled(const Eigen::Vector4f& a_center,
 	addTri(verts[6], verts[2], verts[7], a_fillColour);
 }
 
-void Gizmos::addCylinderFilled(const Eigen::Vector4f& a_center, float a_radius, float a_halfLength,
+void Gizmos::addCylinderFilled(const Eigen::Vector3f& a_center, float a_radius, float a_halfLength,
 	unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
 	Eigen::Vector4f white(1,1,1,1);
@@ -311,21 +316,23 @@ void Gizmos::addCylinderFilled(const Eigen::Vector4f& a_center, float a_radius, 
 
 	for ( unsigned int i = 0 ; i < a_segments ; ++i )
 	{
-		Eigen::Vector4f v0top(0,a_halfLength,0,0);
-		Eigen::Vector4f v1top( sinf( i * segmentSize ) * a_radius, a_halfLength, cosf( i * segmentSize ) * a_radius,0 );
-		Eigen::Vector4f v2top( sinf( (i+1) * segmentSize ) * a_radius, a_halfLength, cosf( (i+1) * segmentSize ) * a_radius,0 );
-		Eigen::Vector4f v0bottom(0,-a_halfLength,0,0);
-		Eigen::Vector4f v1bottom( sinf( i * segmentSize ) * a_radius, -a_halfLength, cosf( i * segmentSize ) * a_radius,0 );
-		Eigen::Vector4f v2bottom( sinf( (i+1) * segmentSize ) * a_radius, -a_halfLength, cosf( (i+1) * segmentSize ) * a_radius ,0);
+		Eigen::Vector3f v0top(0,a_halfLength,0);
+		Eigen::Vector3f v1top( sinf( i * segmentSize ) * a_radius, a_halfLength, cosf( i * segmentSize ) * a_radius);
+		Eigen::Vector3f v2top( sinf( (i+1) * segmentSize ) * a_radius, a_halfLength, cosf( (i+1) * segmentSize ) * a_radius);
+		Eigen::Vector3f v0bottom(0,-a_halfLength,0);
+		Eigen::Vector3f v1bottom( sinf( i * segmentSize ) * a_radius, -a_halfLength, cosf( i * segmentSize ) * a_radius);
+		Eigen::Vector3f v2bottom( sinf( (i+1) * segmentSize ) * a_radius, -a_halfLength, cosf( (i+1) * segmentSize ) * a_radius);
 
 		if (a_transform != nullptr)
 		{
-			v0top = *a_transform * v0top;
-			v1top = *a_transform * v1top;
-			v2top = *a_transform * v2top;
-			v0bottom = *a_transform * v0bottom;
-			v1bottom = *a_transform * v1bottom;
-			v2bottom = *a_transform * v2bottom;
+			Eigen::Affine3f aff(*a_transform);
+
+			v0top = aff * v0top;
+			v1top = aff * v1top;
+			v2top = aff * v2top;
+			v0bottom = aff * v0bottom;
+			v1bottom = aff * v1bottom;
+			v2bottom = aff * v2bottom;
 		}
 
 		// triangles
@@ -341,7 +348,7 @@ void Gizmos::addCylinderFilled(const Eigen::Vector4f& a_center, float a_radius, 
 	}
 }
 
-void Gizmos::addRing(const Eigen::Vector4f& a_center, float a_innerRadius, float a_outerRadius,
+void Gizmos::addRing(const Eigen::Vector3f& a_center, float a_innerRadius, float a_outerRadius,
 	unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
 	Eigen::Vector4f solidColour = a_fillColour;
@@ -351,17 +358,19 @@ void Gizmos::addRing(const Eigen::Vector4f& a_center, float a_innerRadius, float
 
 	for ( unsigned int i = 0 ; i < a_segments ; ++i )
 	{
-		Eigen::Vector4f v1outer( sinf( i * segmentSize ) * a_outerRadius, 0, cosf( i * segmentSize ) * a_outerRadius, 0 );
-		Eigen::Vector4f v2outer( sinf( (i+1) * segmentSize ) * a_outerRadius, 0, cosf( (i+1) * segmentSize ) * a_outerRadius, 0 );
-		Eigen::Vector4f v1inner( sinf( i * segmentSize ) * a_innerRadius, 0, cosf( i * segmentSize ) * a_innerRadius, 0 );
-		Eigen::Vector4f v2inner( sinf( (i+1) * segmentSize ) * a_innerRadius, 0, cosf( (i+1) * segmentSize ) * a_innerRadius, 0 );
+		Eigen::Vector3f v1outer( sinf( i * segmentSize ) * a_outerRadius, 0, cosf( i * segmentSize ) * a_outerRadius );
+		Eigen::Vector3f v2outer( sinf( (i+1) * segmentSize ) * a_outerRadius, 0, cosf( (i+1) * segmentSize ) * a_outerRadius );
+		Eigen::Vector3f v1inner( sinf( i * segmentSize ) * a_innerRadius, 0, cosf( i * segmentSize ) * a_innerRadius );
+		Eigen::Vector3f v2inner( sinf( (i+1) * segmentSize ) * a_innerRadius, 0, cosf( (i+1) * segmentSize ) * a_innerRadius );
 
 		if (a_transform != nullptr)
 		{
-			v1outer = *a_transform * v1outer;
-			v2outer = *a_transform * v2outer;
-			v1inner = *a_transform * v1inner;
-			v2inner = *a_transform * v2inner;
+			Eigen::Affine3f aff(*a_transform);
+
+			v1outer = aff * v1outer;
+			v2outer = aff * v2outer;
+			v1inner = aff * v1inner;
+			v2inner = aff * v2inner;
 		}
 
 		if (a_fillColour[3] != 0)
@@ -381,7 +390,7 @@ void Gizmos::addRing(const Eigen::Vector4f& a_center, float a_innerRadius, float
 	}
 }
 
-void Gizmos::addDisk(const Eigen::Vector4f& a_center, float a_radius,
+void Gizmos::addDisk(const Eigen::Vector3f& a_center, float a_radius,
 	unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
 	Eigen::Vector4f vSolid = a_fillColour;
@@ -391,13 +400,15 @@ void Gizmos::addDisk(const Eigen::Vector4f& a_center, float a_radius,
 
 	for ( unsigned int i = 0 ; i < a_segments ; ++i )
 	{
-		Eigen::Vector4f v1outer( sinf( i * fSegmentSize ) * a_radius, 0, cosf( i * fSegmentSize ) * a_radius, 0 );
-		Eigen::Vector4f v2outer( sinf( (i+1) * fSegmentSize ) * a_radius, 0, cosf( (i+1) * fSegmentSize ) * a_radius, 0 );
+		Eigen::Vector3f v1outer( sinf( i * fSegmentSize ) * a_radius, 0, cosf( i * fSegmentSize ) * a_radius );
+		Eigen::Vector3f v2outer( sinf( (i+1) * fSegmentSize ) * a_radius, 0, cosf( (i+1) * fSegmentSize ) * a_radius );
 
 		if (a_transform != nullptr)
 		{
-			v1outer = *a_transform * v1outer;
-			v2outer = *a_transform * v2outer;
+			Eigen::Affine3f aff(*a_transform);
+
+			v1outer = aff * v1outer;
+			v2outer = aff * v2outer;
 		}
 
 		if (a_fillColour[3] != 0)
@@ -413,7 +424,7 @@ void Gizmos::addDisk(const Eigen::Vector4f& a_center, float a_radius,
 	}
 }
 
-void Gizmos::addArc(const Eigen::Vector4f& a_center,
+void Gizmos::addArc(const Eigen::Vector3f& a_center,
 	float a_radius, float a_arcHalfAngle, float a_rotation,
 	unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
@@ -424,13 +435,15 @@ void Gizmos::addArc(const Eigen::Vector4f& a_center,
 
 	for ( unsigned int i = 0 ; i < a_segments ; ++i )
 	{
-		Eigen::Vector4f v1outer( sinf( i * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_radius, 0, cosf( i * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_radius, 0 );
-		Eigen::Vector4f v2outer( sinf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_radius, 0, cosf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_radius, 0 );
+		Eigen::Vector3f v1outer( sinf( i * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_radius, 0, cosf( i * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_radius );
+		Eigen::Vector3f v2outer( sinf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_radius, 0, cosf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_radius );
 
 		if (a_transform != nullptr)
 		{
-			v1outer = *a_transform * v1outer;
-			v2outer = *a_transform * v2outer;
+			Eigen::Affine3f aff(*a_transform);
+
+			v1outer = aff * v1outer;
+			v2outer = aff * v2outer;
 		}
 
 		if (a_fillColour[3] != 0)
@@ -448,13 +461,15 @@ void Gizmos::addArc(const Eigen::Vector4f& a_center,
 	// edge lines
 	if (a_fillColour[3] == 0)
 	{
-		Eigen::Vector4f v1outer( sinf( -a_arcHalfAngle + a_rotation ) * a_radius, 0, cosf( -a_arcHalfAngle + a_rotation ) * a_radius, 0 );
-		Eigen::Vector4f v2outer( sinf( a_arcHalfAngle + a_rotation ) * a_radius, 0, cosf( a_arcHalfAngle + a_rotation ) * a_radius, 0 );
+		Eigen::Vector3f v1outer( sinf( -a_arcHalfAngle + a_rotation ) * a_radius, 0, cosf( -a_arcHalfAngle + a_rotation ) * a_radius );
+		Eigen::Vector3f v2outer( sinf( a_arcHalfAngle + a_rotation ) * a_radius, 0, cosf( a_arcHalfAngle + a_rotation ) * a_radius );
 
 		if (a_transform != nullptr)
 		{
-			v1outer = *a_transform * v1outer;
-			v2outer = *a_transform * v2outer;
+			Eigen::Affine3f aff(*a_transform);
+
+			v1outer = aff * v1outer;
+			v2outer = aff * v2outer;
 		}
 
 		addLine(a_center, a_center + v1outer, vSolid, vSolid);
@@ -462,7 +477,7 @@ void Gizmos::addArc(const Eigen::Vector4f& a_center,
 	}
 }
 
-void Gizmos::addArcRing(const Eigen::Vector4f& a_center,
+void Gizmos::addArcRing(const Eigen::Vector3f& a_center,
 	float a_innerRadius, float a_outerRadius, float a_arcHalfAngle, float a_rotation, 
 	unsigned int a_segments, const Eigen::Vector4f& a_fillColour, const Eigen::Matrix4f* a_transform /* = nullptr */)
 {
@@ -473,17 +488,19 @@ void Gizmos::addArcRing(const Eigen::Vector4f& a_center,
 
 	for ( unsigned int i = 0 ; i < a_segments ; ++i )
 	{
-		Eigen::Vector4f v1outer( sinf( i * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_outerRadius, 0, cosf( i * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_outerRadius, 0 );
-		Eigen::Vector4f v2outer( sinf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_outerRadius, 0, cosf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_outerRadius, 0 );
-		Eigen::Vector4f v1inner( sinf( i * fSegmentSize - a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0, cosf( i * fSegmentSize - a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0 );
-		Eigen::Vector4f v2inner( sinf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0, cosf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0 );
+		Eigen::Vector3f v1outer( sinf( i * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_outerRadius, 0, cosf( i * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_outerRadius );
+		Eigen::Vector3f v2outer( sinf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_outerRadius, 0, cosf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation ) * a_outerRadius );
+		Eigen::Vector3f v1inner( sinf( i * fSegmentSize - a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0, cosf( i * fSegmentSize - a_arcHalfAngle + a_rotation  ) * a_innerRadius );
+		Eigen::Vector3f v2inner( sinf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0, cosf( (i+1) * fSegmentSize - a_arcHalfAngle + a_rotation  ) * a_innerRadius );
 
 		if (a_transform != nullptr)
 		{
-			v1outer = *a_transform * v1outer;
-			v2outer = *a_transform * v2outer;
-			v1inner = *a_transform * v1inner;
-			v2inner = *a_transform * v2inner;
+			Eigen::Affine3f aff(*a_transform);
+
+			v1outer = aff * v1outer;
+			v2outer = aff * v2outer;
+			v1inner = aff * v1inner;
+			v2inner = aff * v2inner;
 		}
 
 		if (a_fillColour[3] != 0)
@@ -505,17 +522,19 @@ void Gizmos::addArcRing(const Eigen::Vector4f& a_center,
 	// edge lines
 	if (a_fillColour[3] == 0)
 	{
-		Eigen::Vector4f v1outer( sinf( -a_arcHalfAngle + a_rotation ) * a_outerRadius, 0, cosf( -a_arcHalfAngle + a_rotation ) * a_outerRadius, 0 );
-		Eigen::Vector4f v2outer( sinf( a_arcHalfAngle + a_rotation ) * a_outerRadius, 0, cosf( a_arcHalfAngle + a_rotation ) * a_outerRadius, 0 );
-		Eigen::Vector4f v1inner( sinf( -a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0, cosf( -a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0 );
-		Eigen::Vector4f v2inner( sinf( a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0, cosf( a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0 );
+		Eigen::Vector3f v1outer( sinf( -a_arcHalfAngle + a_rotation ) * a_outerRadius, 0, cosf( -a_arcHalfAngle + a_rotation ) * a_outerRadius );
+		Eigen::Vector3f v2outer( sinf( a_arcHalfAngle + a_rotation ) * a_outerRadius, 0, cosf( a_arcHalfAngle + a_rotation ) * a_outerRadius );
+		Eigen::Vector3f v1inner( sinf( -a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0, cosf( -a_arcHalfAngle + a_rotation  ) * a_innerRadius );
+		Eigen::Vector3f v2inner( sinf( a_arcHalfAngle + a_rotation  ) * a_innerRadius, 0, cosf( a_arcHalfAngle + a_rotation  ) * a_innerRadius );
 
 		if (a_transform != nullptr)
 		{
-			v1outer = *a_transform * v1outer;
-			v2outer = *a_transform * v2outer;
-			v1inner = *a_transform * v1inner;
-			v2inner = *a_transform * v2inner;
+			Eigen::Affine3f aff(*a_transform);
+
+			v1outer = aff * v1outer;
+			v2outer = aff * v2outer;
+			v1inner = aff * v1inner;
+			v2inner = aff * v2inner;
 		}
 
 		addLine(a_center + v1inner, a_center + v1outer, vSolid, vSolid);
@@ -523,7 +542,7 @@ void Gizmos::addArcRing(const Eigen::Vector4f& a_center,
 	}
 }
 
-void Gizmos::addSphere(const Eigen::Vector4f& a_center, float a_radius, int a_rings, int a_segments, const Eigen::Vector4f& a_fillColour, 
+void Gizmos::addSphere(const Eigen::Vector3f& a_center, float a_radius, int a_rings, int a_segments, const Eigen::Vector4f& a_fillColour,
 								const Eigen::Matrix4f* a_transform /*= nullptr*/, float a_longitudeMin /*= 0.0f*/, float a_longitudeMax /*= pi<float>() * 2*/, 
 								float a_latitudeMin /*= -half_pi<float>()*/, float a_latitudeMax /*= half_pi<float>()*/)
 {
@@ -537,7 +556,7 @@ void Gizmos::addSphere(const Eigen::Vector4f& a_center, float a_radius, int a_ri
 	float longitudinalRange = a_longitudeMax - a_longitudeMin;
 
 	// for each row of the mesh
-	Eigen::Vector4f* v4Array = new Eigen::Vector4f[a_rings*a_segments + a_segments];
+	Eigen::Vector3f* v4Array = new Eigen::Vector3f[a_rings*a_segments + a_segments];
 
 	for (int row = 0; row <= a_rings; ++row)
 	{
@@ -553,13 +572,15 @@ void Gizmos::addSphere(const Eigen::Vector4f& a_center, float a_radius, int a_ri
 			float ratioAroundYAxis   = float(col) * invColumns;
 			float v_textureCoordinate = fabsf(ratioAroundYAxis - 1.0f);
 			float theta = ratioAroundYAxis * longitudinalRange + a_longitudeMin;
-			Eigen::Vector4f v4Point = Eigen::Vector4f( -z * sinf(theta), y, -z * cosf(theta), 0 );
-			Eigen::Vector4f v4Normal = Eigen::Vector4f( inverseRadius * v4Point[0], inverseRadius * v4Point[1], inverseRadius * v4Point[2], 0.f);
+			Eigen::Vector3f v4Point = Eigen::Vector3f( -z * sinf(theta), y, -z * cosf(theta) );
+			Eigen::Vector3f v4Normal = Eigen::Vector3f( inverseRadius * v4Point[0], inverseRadius * v4Point[1], inverseRadius * v4Point[2] );
 
 			if (a_transform != nullptr)
 			{
-				v4Point = *a_transform * v4Point;
-				v4Normal = *a_transform * v4Normal;
+				Eigen::Affine3f aff(*a_transform);
+
+				v4Point = aff * v4Point;
+				v4Normal = aff * v4Normal;
 			}
 			Eigen::Vector2f v2TextureCoords = Eigen::Vector2f( u_textureCoordinate, v_textureCoordinate);
 			int index = row * a_segments + (col % a_segments);
@@ -592,12 +613,12 @@ void Gizmos::addSphere(const Eigen::Vector4f& a_center, float a_radius, int a_ri
 	delete[] v4Array;	
 }
 
-void Gizmos::addHermiteSpline(const Eigen::Vector4f& a_rvStart, const Eigen::Vector4f& a_rvEnd,
-	const Eigen::Vector4f& a_rvTangentStart, const Eigen::Vector4f& a_rvTangentEnd, unsigned int a_uiSegment, const Eigen::Vector4f& a_colour)
+void Gizmos::addHermiteSpline(const Eigen::Vector3f& a_rvStart, const Eigen::Vector3f& a_rvEnd,
+	const Eigen::Vector3f& a_rvTangentStart, const Eigen::Vector3f& a_rvTangentEnd, unsigned int a_uiSegment, const Eigen::Vector4f& a_colour)
 {
 	a_uiSegment = a_uiSegment > 1 ? a_uiSegment : 1;
 
-	Eigen::Vector4f vPrev = a_rvStart;
+	Eigen::Vector3f vPrev = a_rvStart;
 
 	for ( unsigned int i = 1 ; i <= a_uiSegment ; ++i )
 	{
@@ -609,7 +630,7 @@ void Gizmos::addHermiteSpline(const Eigen::Vector4f& a_rvStart, const Eigen::Vec
 		float h2 = (-2.0f * s3) + (3.0f * s2);
 		float h3 =  s3- (2.0f * s2) + s;
 		float h4 = s3 - s2;
-		Eigen::Vector4f p = (a_rvStart * h1) + (a_rvEnd * h2) + (a_rvTangentStart * h3) + (a_rvTangentEnd * h4);
+		Eigen::Vector3f p = (a_rvStart * h1) + (a_rvEnd * h2) + (a_rvTangentStart * h3) + (a_rvTangentEnd * h4);
 		p[3] = 1;
 
 		addLine(vPrev,p,a_colour,a_colour);
@@ -617,38 +638,76 @@ void Gizmos::addHermiteSpline(const Eigen::Vector4f& a_rvStart, const Eigen::Vec
 	}
 }
 
-void Gizmos::addLine(const Eigen::Vector4f& a_rv0,  const Eigen::Vector4f& a_rv1, 
+void Gizmos::addLine(const Eigen::Vector3f& a_rv0,  const Eigen::Vector3f& a_rv1,
 	const Eigen::Vector4f& a_colour)
 {
 	addLine(a_rv0,a_rv1,a_colour,a_colour);
 }
 
-void Gizmos::addLine(const Eigen::Vector4f& a_v0, const Eigen::Vector4f& a_v1, 
+void Gizmos::addLine(const Eigen::Vector3f& a_v0, const Eigen::Vector3f& a_v1,
 	const Eigen::Vector4f& a_colour0, const Eigen::Vector4f& a_colour1)
 {
 	if (m_lineCount < m_maxLines)
 	{
-		m_lines[ m_lineCount ].v0.position = a_v0;
-		m_lines[ m_lineCount ].v0.colour = a_colour0;
-		m_lines[ m_lineCount ].v1.position = a_v1;
-		m_lines[ m_lineCount ].v1.colour = a_colour1;
+	//	m_lines[ m_lineCount ].v0.position = a_v0;
+	//	m_lines[ m_lineCount ].v0.colour = a_colour0;
+	//	m_lines[ m_lineCount ].v1.position = a_v1;
+	//	m_lines[ m_lineCount ].v1.colour = a_colour1;
+
+		m_lines[m_lineCount].v0.x = a_v0[0];
+		m_lines[m_lineCount].v0.y = a_v0[1];
+		m_lines[m_lineCount].v0.z = a_v0[2];
+		m_lines[m_lineCount].v0.r = a_colour0[0];
+		m_lines[m_lineCount].v0.g = a_colour0[1];
+		m_lines[m_lineCount].v0.b = a_colour0[2];
+		m_lines[m_lineCount].v0.a = a_colour0[3];
+
+		m_lines[m_lineCount].v1.x = a_v1[0];
+		m_lines[m_lineCount].v1.y = a_v1[1];
+		m_lines[m_lineCount].v1.z = a_v1[2];
+		m_lines[m_lineCount].v1.r = a_colour1[0];
+		m_lines[m_lineCount].v1.g = a_colour1[1];
+		m_lines[m_lineCount].v1.b = a_colour1[2];
+		m_lines[m_lineCount].v1.a = a_colour1[3];
 
 		++m_lineCount;
 	}
 }
 
-void Gizmos::addTri(const Eigen::Vector4f& a_v0, const Eigen::Vector4f& a_v1, const Eigen::Vector4f& a_v2, const Eigen::Vector4f& a_colour)
+void Gizmos::addTri(const Eigen::Vector3f& a_v0, const Eigen::Vector3f& a_v1, const Eigen::Vector3f& a_v2, const Eigen::Vector4f& a_colour)
 {
 	if (a_colour[3] == 1)
 	{
 		if (m_triCount < m_maxTris)
 		{
-			m_tris[ m_triCount ].v0.position = a_v0;
-			m_tris[ m_triCount ].v1.position = a_v1;
-			m_tris[ m_triCount ].v2.position = a_v2;
-			m_tris[ m_triCount ].v0.colour = a_colour;
-			m_tris[ m_triCount ].v1.colour = a_colour;
-			m_tris[ m_triCount ].v2.colour = a_colour;
+		//	m_tris[ m_triCount ].v0.position = a_v0;
+		//	m_tris[ m_triCount ].v1.position = a_v1;
+		//	m_tris[ m_triCount ].v2.position = a_v2;
+		//	m_tris[ m_triCount ].v0.colour = a_colour;
+		//	m_tris[ m_triCount ].v1.colour = a_colour;
+		//	m_tris[ m_triCount ].v2.colour = a_colour;
+
+			m_tris[m_triCount].v0.x = a_v0[0];
+			m_tris[m_triCount].v0.y = a_v0[1];
+			m_tris[m_triCount].v0.z = a_v0[2];
+			m_tris[m_triCount].v0.r = a_colour[0];
+			m_tris[m_triCount].v0.g = a_colour[1];
+			m_tris[m_triCount].v0.b = a_colour[2];
+			m_tris[m_triCount].v0.a = a_colour[3];
+			m_tris[m_triCount].v1.x = a_v1[0];
+			m_tris[m_triCount].v1.y = a_v1[1];
+			m_tris[m_triCount].v1.z = a_v1[2];
+			m_tris[m_triCount].v1.r = a_colour[0];
+			m_tris[m_triCount].v1.g = a_colour[1];
+			m_tris[m_triCount].v1.b = a_colour[2];
+			m_tris[m_triCount].v1.a = a_colour[3];
+			m_tris[m_triCount].v2.x = a_v2[0];
+			m_tris[m_triCount].v2.y = a_v2[1];
+			m_tris[m_triCount].v2.z = a_v2[2];
+			m_tris[m_triCount].v2.r = a_colour[0];
+			m_tris[m_triCount].v2.g = a_colour[1];
+			m_tris[m_triCount].v2.b = a_colour[2];
+			m_tris[m_triCount].v2.a = a_colour[3];
 
 			++m_triCount;
 		}
@@ -657,12 +716,34 @@ void Gizmos::addTri(const Eigen::Vector4f& a_v0, const Eigen::Vector4f& a_v1, co
 	{
 		if (m_alphaTriCount < m_maxTris)
 		{
-			m_alphaTris[ m_alphaTriCount ].v0.position = a_v0;
-			m_alphaTris[ m_alphaTriCount ].v1.position = a_v1;
-			m_alphaTris[ m_alphaTriCount ].v2.position = a_v2;
-			m_alphaTris[ m_alphaTriCount ].v0.colour = a_colour;
-			m_alphaTris[ m_alphaTriCount ].v1.colour = a_colour;
-			m_alphaTris[ m_alphaTriCount ].v2.colour = a_colour;
+		//	m_alphaTris[ m_alphaTriCount ].v0.position = a_v0;
+		//	m_alphaTris[ m_alphaTriCount ].v1.position = a_v1;
+		//	m_alphaTris[ m_alphaTriCount ].v2.position = a_v2;
+		//	m_alphaTris[ m_alphaTriCount ].v0.colour = a_colour;
+		//	m_alphaTris[ m_alphaTriCount ].v1.colour = a_colour;
+		//	m_alphaTris[ m_alphaTriCount ].v2.colour = a_colour;
+
+			m_alphaTris[m_alphaTriCount].v0.x = a_v0[0];
+			m_alphaTris[m_alphaTriCount].v0.y = a_v0[1];
+			m_alphaTris[m_alphaTriCount].v0.z = a_v0[2];
+			m_alphaTris[m_alphaTriCount].v0.r = a_colour[0];
+			m_alphaTris[m_alphaTriCount].v0.g = a_colour[1];
+			m_alphaTris[m_alphaTriCount].v0.b = a_colour[2];
+			m_alphaTris[m_alphaTriCount].v0.a = a_colour[3];
+			m_alphaTris[m_alphaTriCount].v1.x = a_v1[0];
+			m_alphaTris[m_alphaTriCount].v1.y = a_v1[1];
+			m_alphaTris[m_alphaTriCount].v1.z = a_v1[2];
+			m_alphaTris[m_alphaTriCount].v1.r = a_colour[0];
+			m_alphaTris[m_alphaTriCount].v1.g = a_colour[1];
+			m_alphaTris[m_alphaTriCount].v1.b = a_colour[2];
+			m_alphaTris[m_alphaTriCount].v1.a = a_colour[3];
+			m_alphaTris[m_alphaTriCount].v2.x = a_v2[0];
+			m_alphaTris[m_alphaTriCount].v2.y = a_v2[1];
+			m_alphaTris[m_alphaTriCount].v2.z = a_v2[2];
+			m_alphaTris[m_alphaTriCount].v2.r = a_colour[0];
+			m_alphaTris[m_alphaTriCount].v2.g = a_colour[1];
+			m_alphaTris[m_alphaTriCount].v2.b = a_colour[2];
+			m_alphaTris[m_alphaTriCount].v2.a = a_colour[3];
 
 			++m_alphaTriCount;
 		}

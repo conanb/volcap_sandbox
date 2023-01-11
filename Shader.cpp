@@ -198,15 +198,15 @@ void Shader::extractUniforms()
 			case GL_UNSIGNED_INT:
 				m_uniforms[id] = new Uniform<unsigned int>(buffer, i, uniformSize, uniformType, this);
 				break;
-		/*	case GL_UNSIGNED_INT_VEC2:
-				m_uniforms[id] = new Uniform<glm::uvec2>(buffer, i, uniformSize, uniformType, this);
+			case GL_UNSIGNED_INT_VEC2:
+				m_uniforms[id] = new Uniform<Eigen::Vector<unsigned int, 2>>(buffer, i, uniformSize, uniformType, this);
 				break;
 			case GL_UNSIGNED_INT_VEC3:
-				m_uniforms[id] = new Uniform<glm::uvec3>(buffer, i, uniformSize, uniformType, this);
+				m_uniforms[id] = new Uniform<Eigen::Vector<unsigned int, 3>>(buffer, i, uniformSize, uniformType, this);
 				break;
 			case GL_UNSIGNED_INT_VEC4:
-				m_uniforms[id] = new Uniform<glm::uvec4>(buffer, i, uniformSize, uniformType, this);
-				break;*/
+				m_uniforms[id] = new Uniform<Eigen::Vector<unsigned int, 4>>(buffer, i, uniformSize, uniformType, this);
+				break;
 			case GL_FLOAT_MAT2:
 				m_uniforms[id] = new Uniform<Eigen::Matrix2f>(buffer, i, uniformSize, uniformType, this);
 				break;
@@ -321,22 +321,22 @@ void Shader::UniformBase::bind(const Eigen::Vector4i& v)
 {
 	glUniform4iv(m_location, 1, v.data());
 }
-/*
-void Shader::UniformBase::bind(const glm::uvec2& iv)
+
+void Shader::UniformBase::bind(const Eigen::Vector<unsigned int, 2>& v)
 {
-	glUniform2uiv(m_location, 1, glm::value_ptr(iv));
+	glUniform2uiv(m_location, 1, v.data());
 }
 
-void Shader::UniformBase::bind(const glm::uvec3& iv)
+void Shader::UniformBase::bind(const Eigen::Vector<unsigned int, 3>& v)
 {
-	glUniform3uiv(m_location, 1, glm::value_ptr(iv));
+	glUniform3uiv(m_location, 1, v.data());
 }
 
-void Shader::UniformBase::bind(const glm::uvec4& iv)
+void Shader::UniformBase::bind(const Eigen::Vector<unsigned int, 4>& v)
 {
-	glUniform4uiv(m_location, 1, glm::value_ptr(iv));
+	glUniform4uiv(m_location, 1, v.data());
 }
-*/
+
 void Shader::UniformBase::bind(const Eigen::Matrix2f& m)
 {
 	glUniformMatrix2fv(m_location, 1, GL_FALSE, m.data());
@@ -396,22 +396,22 @@ void Shader::UniformBase::bind(unsigned int a_count, const Eigen::Vector4i* v)
 {
 	glUniform4iv(m_location, a_count, (*v).data());
 }
-/*
-void Shader::UniformBase::bind(unsigned int a_count, const glm::uvec2* iv)
+
+void Shader::UniformBase::bind(unsigned int a_count, const Eigen::Vector<unsigned int, 2>* v)
 {
-	glUniform2uiv(m_location, a_count, glm::value_ptr(*iv));
+	glUniform2uiv(m_location, a_count, (*v).data());
 }
 
-void Shader::UniformBase::bind(unsigned int a_count, const glm::uvec3* iv)
+void Shader::UniformBase::bind(unsigned int a_count, const Eigen::Vector<unsigned int, 3>* v)
 {
-	glUniform3uiv(m_location, a_count, glm::value_ptr(*iv));
+	glUniform3uiv(m_location, a_count, (*v).data());
 }
 
-void Shader::UniformBase::bind(unsigned int a_count, const glm::uvec4* iv)
+void Shader::UniformBase::bind(unsigned int a_count, const Eigen::Vector<unsigned int, 4>* v)
 {
-	glUniform4uiv(m_location, a_count, glm::value_ptr(*iv));
+	glUniform4uiv(m_location, a_count, (*v).data());
 }
-*/
+
 void Shader::UniformBase::bind(unsigned int a_count, const Eigen::Matrix2f* m)
 {
 	glUniformMatrix2fv(m_location, a_count, GL_FALSE, (*m).data());
